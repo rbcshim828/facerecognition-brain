@@ -10,34 +10,8 @@ import Register from './components/Register/Register';
 import Clarifai from 'clarifai';
 import './App.css';
 
-const app = new Clarifai.App({apiKey: 'ab1b946067e3440b934e808dc0891746'});
+const app = new Clarifai.App({apiKey: ''});
 
-/*
-app = ClarifaiApp(api_key='ab1b946067e3440b934e808dc0891746')
-new ClarifaiBuilder("ab1b946067e3440b934e808dc0891746").buildSync();
-using System.Threading.Tasks;
-using Clarifai.API;
-
-namespace YourNamespace
-{
-    public class YourClassName
-    {
-        public static async Task Main()
-        {
-            var client = new ClarifaiClient("ab1b946067e3440b934e808dc0891746");
-        }
-    }
-}
-ClarifaiApp *app = [[ClarifaiApp alloc] initWithApiKey:@"ab1b946067e3440b934e808dc0891746"];
-use Clarifai\API\ClarifaiClient;
-
-$client = new ClarifaiClient('ab1b946067e3440b934e808dc0891746');
-curl -X POST \
-  -H 'Authorization: Key ab1b946067e3440b934e808dc0891746' \
-  -H "Content-Type: application/json" \
-  -d '
-
-*/
 const particlesOptions = {
   particles: {
     number:{
@@ -52,6 +26,8 @@ const particlesOptions = {
     }
   }
 }
+
+
 class App extends Component {
   constructor(){
     super();
@@ -60,8 +36,25 @@ class App extends Component {
       imageUrl: '',
       box: {},
       route: 'signin',
-      isSignedIn: false
+      isSignedIn: false,
+      user: {
+        id: '',
+        name: '',
+        email: '',
+        entries: 0,
+        joined: ''
+      }
     }
+  }
+
+  loadUser = (data) => {
+    this.setState ({user: {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      entries: data.entries,
+      joined: data.joined
+    }})
   }
 
   calculateFaceLocation = (data) => {
@@ -87,12 +80,28 @@ class App extends Component {
     this.setState({input: event.target.value});
   }
 
-  onButtonSubmit = () => {
+  onPicktureSubmit = () => {
     this.setState({imageUrl: this.state.input});
     app.models.predict(
       Clarifai.FACE_DETECT_MODEL,
-      this.state.input)
-      .then(response => this.displayFaceBox(this.calculateFaceLocation(response)))
+      this.state.input
+      )
+      .then(response => {
+        if (response) {
+          fetch('http://localhost:3000/image',{
+            method: 'put',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              id: this.state.user.id
+            })
+          })
+          .then(response => response.json())
+          .then(count => { // response 받은 count를 user{entries:count}형식으로 업데이트시 user전체 갱신되어 저장해놓은 나머지 user데이터 날아감
+            this.setState(Object.assign(this.state.user, {entries: count}))
+          })
+        }
+        this.displayFaceBox(this.calculateFaceLocation(response))
+      })
       .catch(err => console.log(err));
   }
 
@@ -106,7 +115,7 @@ class App extends Component {
   }
 
   render(){
-    const  {isSignedIn, imageUrl, route, box} = this.state;
+    const  {isSignedIn, imageUrl, route, box, user} = this.state;
       return (
         <div className="App">
           <Particles className='particles'
@@ -116,17 +125,17 @@ class App extends Component {
           <Logo />
             {route === 'home'
              ? <div>
-                <Rank />
+                <Rank name = {user.name} entries = {user.entries}/>
                 <ImageLinkForm
                   onInputChange={this.onInputChange}
-                  onButtonSubmit={this.onButtonSubmit}
+                  onPicktureSubmit={this.onPicktureSubmit}
                 />
                 <FaceRecognition box={box} imageUrl={imageUrl}/>
               </div>
               : (
                   route ==='register'
-                  ? <Register onRouteChange={this.onRouteChange} />
-                  : <SignIn onRouteChange={this.onRouteChange} />
+                  ? <Register onRouteChange={this.onRouteChange} loadUser={this.loadUser} />
+                  : <SignIn onRouteChange={this.onRouteChange} loadUser={this.loadUser}/>
               )
 
          }
